@@ -3,31 +3,45 @@ set -e
 
 echo "🚀 Installing NIOXON CLI"
 
-apt update -y
-apt install -y git curl ca-certificates
+# Update package index and install basic toolsets
+apt-get update -y
+apt-get install -y git curl ca-certificates rsync unzip
 
-# Always clone cleanly
-if [ ! -d /opt/nioxon/.git ]; then
-  rm -rf /opt/nioxon
-  git clone https://github.com/nioxon/provision.git /opt/nioxon
+# Detect if running from a local development folder containing the files
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/bin/nioxon" ] && [ -d "$SCRIPT_DIR/provision" ]; then
+  echo "📦 Local files detected at $SCRIPT_DIR"
+  echo "   Syncing local files to /opt/nioxon..."
+  mkdir -p /opt/nioxon
+  rsync -a --delete \
+    --exclude='.git' \
+    --exclude='.idea' \
+    --exclude='provision-clean' \
+    "$SCRIPT_DIR/" /opt/nioxon/
 else
-  cd /opt/nioxon && git pull
+  # Production remote deployment mode
+  if [ ! -d /opt/nioxon/.git ]; then
+    rm -rf /opt/nioxon
+    git clone https://github.com/nioxon/provision.git /opt/nioxon
+  else
+    cd /opt/nioxon && git pull
+  fi
 fi
 
-# Ensure CLI exists
+# Ensure CLI binary exists
 if [ ! -f /opt/nioxon/bin/nioxon ]; then
-  echo "❌ bin/nioxon missing in repo"
+  echo "❌ bin/nioxon missing in repository structure"
   exit 1
 fi
 
 chmod +x /opt/nioxon/bin/nioxon
 
-# Global launcher (PATH-safe)
+# Global launcher (PATH-safe launcher in /usr/bin)
 cat > /usr/bin/nioxon <<'EOF'
 #!/usr/bin/env bash
 exec /opt/nioxon/bin/nioxon "$@"
 EOF
 chmod +x /usr/bin/nioxon
 
-echo "✔ NIOXON installed"
-echo "👉 Run: nioxon setup"
+echo "✔ NIOXON CLI successfully installed!"
+echo "👉 Run: sudo nioxon setup"

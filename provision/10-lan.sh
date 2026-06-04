@@ -16,12 +16,12 @@ fi
 NETPLAN_FILE="/etc/netplan/50-nioxon-lan.yaml"
 
 # -------------------------
-# Write netplan safely
+# Write netplan safely (using NetworkManager renderer)
 # -------------------------
 cat > "$NETPLAN_FILE" <<EOF
 network:
   version: 2
-  renderer: networkd
+  renderer: NetworkManager
   ethernets:
     ${LAN_IFACE}:
       dhcp4: false

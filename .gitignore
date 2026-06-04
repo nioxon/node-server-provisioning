@@ -1,3 +1,5 @@
 nioxplay.zip
 *.zip
 /media/*
+test_mock.sh
+provision-clean/
