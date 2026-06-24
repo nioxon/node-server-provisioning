@@ -26,7 +26,7 @@ if [ "$APP_SOURCE_TYPE" = "git" ]; then
   echo "▶ Cloning Frontend from Git..."
   rm -rf "$FRONTEND_DIR"
   CLONE_URL=$(get_git_clone_url "$FRONTEND_SOURCE_VALUE" "$GITHUB_PAT")
-  git clone "$CLONE_URL" "$FRONTEND_DIR"
+  GIT_TERMINAL_PROMPT=0 git clone "$CLONE_URL" "$FRONTEND_DIR"
 
 elif [ "$APP_SOURCE_TYPE" = "local" ]; then
   if [ -z "$FRONTEND_SOURCE_VALUE" ] || [ ! -d "$FRONTEND_SOURCE_VALUE" ]; then

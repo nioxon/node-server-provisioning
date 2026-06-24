@@ -26,7 +26,7 @@ if [ "$APP_SOURCE_TYPE" = "git" ]; then
   echo "▶ Cloning API from Git..."
   rm -rf "$API_DIR"
   CLONE_URL=$(get_git_clone_url "$API_SOURCE_VALUE" "$GITHUB_PAT")
-  git clone "$CLONE_URL" "$API_DIR"
+  GIT_TERMINAL_PROMPT=0 git clone "$CLONE_URL" "$API_DIR"
 
 elif [ "$APP_SOURCE_TYPE" = "local" ]; then
   if [ -z "$API_SOURCE_VALUE" ] || [ ! -d "$API_SOURCE_VALUE" ]; then
