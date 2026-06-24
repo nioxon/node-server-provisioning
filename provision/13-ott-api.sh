@@ -13,7 +13,7 @@ get_git_clone_url() {
   local token="$2"
   if [ -n "$token" ]; then
     local clean_url="${raw_url#https://}"
-    echo "https://${token}@${clean_url}"
+    echo "https://x-access-token:${token}@${clean_url}"
   else
     echo "$raw_url"
   fi
