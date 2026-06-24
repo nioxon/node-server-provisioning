@@ -46,11 +46,57 @@ reset_state() {
 
 # ---------------- Helpers ----------------
 detect_lan() {
-  nmcli -t -f DEVICE,TYPE device | awk -F: '$2=="ethernet"{print $1; exit}'
+  if command -v nmcli >/dev/null 2>&1; then
+    local dev
+    dev=$(nmcli -t -f DEVICE,TYPE device | awk -F: '$2=="ethernet"{print $1; exit}')
+    if [ -n "$dev" ]; then
+      echo "$dev"
+      return 0
+    fi
+  fi
+
+  # Fallback: scan /sys/class/net/ for interfaces starting with 'e' (ethernet)
+  for dev in /sys/class/net/e*; do
+    if [ -d "$dev" ]; then
+      basename "$dev"
+      return 0
+    fi
+  done
+
+  # Second fallback: scan /sys/class/net/ and ignore 'lo' and wireless 'w'
+  for dev in /sys/class/net/*; do
+    if [ -d "$dev" ]; then
+      local name
+      name=$(basename "$dev")
+      if [ "$name" != "lo" ] && [[ "$name" != w* ]]; then
+        echo "$name"
+        return 0
+      fi
+    fi
+  done
+  
+  echo ""
 }
 
 detect_wifi() {
-  nmcli -t -f DEVICE,TYPE device | awk -F: '$2=="wifi"{print $1; exit}'
+  if command -v nmcli >/dev/null 2>&1; then
+    local dev
+    dev=$(nmcli -t -f DEVICE,TYPE device | awk -F: '$2=="wifi"{print $1; exit}')
+    if [ -n "$dev" ]; then
+      echo "$dev"
+      return 0
+    fi
+  fi
+
+  # Fallback: scan /sys/class/net/ for interfaces starting with 'w'
+  for dev in /sys/class/net/w*; do
+    if [ -d "$dev" ]; then
+      basename "$dev"
+      return 0
+    fi
+  done
+  
+  echo ""
 }
 
 require_internet() {
@@ -125,6 +171,7 @@ configure() {
   bold "⚙️ NIOXON Configuration"
 
   LAN_IFACE=$(detect_lan)
+  LAN_IFACE=${LAN_IFACE:-eth0}
   WIFI_IFACE=$(detect_wifi)
 
   read -p "Use default configuration values? (y/n) [y]: " USE_DEFAULTS
