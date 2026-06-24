@@ -106,10 +106,41 @@ require_internet() {
   }
 }
 
+parse_pat_file() {
+  local fpath="$1"
+  local val=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Trim whitespace and CR
+    line=$(echo "$line" | tr -d '\r' | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+    [ -z "$line" ] && continue
+    [[ "$line" == "#"* ]] && continue
+    
+    # Normalize spaces around '='
+    local line_norm
+    line_norm=$(echo "$line" | sed 's/[ \t]*=[ \t]*/=/g')
+    
+    # Convert to uppercase for comparison of the key part
+    local upper_line_norm
+    upper_line_norm=$(echo "$line_norm" | tr '[:lower:]' '[:upper:]')
+    
+    if [[ "$upper_line_norm" == *"PAT="* ]]; then
+      # Extract the value from the original normalized line to preserve case
+      val="${line_norm#*=}"
+      val=$(echo "$val" | sed -e 's/^[ \t"'\'']*//' -e 's/[ \t"'\'']*$//')
+      break
+    elif [ -z "$val" ]; then
+      # Store the first non-comment non-empty line as fallback
+      val=$(echo "$line" | sed -e 's/^[ \t"'\'']*//' -e 's/[ \t"'\'']*$//')
+    fi
+  done < "$fpath"
+  echo "$val"
+}
+
 detect_usb_pat() {
   local search_dirs=("/media" "/mnt")
   local file_names=("github.pat" "github_pat.txt" "pat.txt" "nioxon_pat.txt")
 
+  echo "🔍 Scanning already mounted directories..." >&2
   # 1. Check already mounted directories (Desktop automount or manual mount)
   for base in "${search_dirs[@]}"; do
     if [ -d "$base" ]; then
@@ -117,14 +148,9 @@ detect_usb_pat() {
         local found_file
         found_file=$(find "$base" -maxdepth 3 -name "$fname" -type f 2>/dev/null | head -n 1)
         if [ -n "$found_file" ] && [ -f "$found_file" ]; then
+          echo "  - Found PAT file in mounted directory: $found_file" >&2
           local val
-          val=$(cat "$found_file" 2>/dev/null | tr -d '\r')
-          if [[ "$val" =~ ^PAT=[\'\"]?(.*)[\'\"]?$ ]]; then
-            val="${BASH_REMATCH[1]}"
-          elif [[ "$val" =~ ^[\'\"]?(.*)[\'\"]?$ ]]; then
-            val="${BASH_REMATCH[1]}"
-          fi
-          val=$(echo "$val" | sed -e 's/^[ \t"'\'']*//' -e 's/[ \t"'\'']*$//')
+          val=$(parse_pat_file "$found_file")
           if [ -n "$val" ]; then
             echo "$val"
             return 0
@@ -134,10 +160,42 @@ detect_usb_pat() {
     fi
   done
 
+  echo "🔍 Scanning block devices for USB drives..." >&2
   # 2. If not found, try to auto-detect and mount any plugged-in USB drive (Headless Server)
   local temp_mount="/tmp/nioxon_usb_mount"
   local usb_devs=()
-  if [ -d "/dev/disk/by-id" ]; then
+  
+  local usb_parts=()
+  local usb_disks=()
+  
+  if [ -d "/sys/class/block" ]; then
+    for dev_path in /sys/class/block/*; do
+      if [ -e "$dev_path" ]; then
+        local dev_name
+        dev_name=$(basename "$dev_path")
+        if [ -b "/dev/$dev_name" ]; then
+          local sys_path
+          sys_path=$(readlink -f "$dev_path" 2>/dev/null || true)
+          if [[ "$sys_path" == */usb* ]]; then
+            if [ -f "$dev_path/partition" ]; then
+              usb_parts+=("/dev/$dev_name")
+            else
+              # Exclude loop, ram, etc. just in case
+              if [[ "$dev_name" =~ ^(sd[a-z]|nvme[0-9]n[0-9]|mmcblk[0-9])$ ]]; then
+                usb_disks+=("/dev/$dev_name")
+              fi
+            fi
+          fi
+        fi
+      fi
+    done
+  fi
+
+  # Combine: try partitions first, then whole disks
+  usb_devs=("${usb_parts[@]}" "${usb_disks[@]}")
+
+  # Fallback to /dev/disk/by-id/usb-* if usb_devs is still empty
+  if [ ${#usb_devs[@]} -eq 0 ] && [ -d "/dev/disk/by-id" ]; then
     for link in /dev/disk/by-id/usb-*; do
       if [ -L "$link" ]; then
         local real_dev
@@ -149,43 +207,81 @@ detect_usb_pat() {
     done
   fi
 
+  # Fallback to general /dev/sd* (including sda) if still empty
   if [ ${#usb_devs[@]} -eq 0 ]; then
-    for dev in /dev/sd[b-z][1-9]; do
+    for dev in /dev/sd[a-z][0-9] /dev/sd[a-z]; do
       if [ -b "$dev" ]; then
         usb_devs+=("$dev")
       fi
     done
   fi
 
+  if [ ${#usb_devs[@]} -eq 0 ]; then
+    echo "  ❌ No USB block devices detected" >&2
+    rmdir "$temp_mount" >/dev/null 2>&1 || true
+    return 1
+  fi
+
   for dev in "${usb_devs[@]}"; do
     if [ -b "$dev" ]; then
-      mkdir -p "$temp_mount"
-      if mount -o ro "$dev" "$temp_mount" >/dev/null 2>&1 || mount "$dev" "$temp_mount" >/dev/null 2>&1; then
+      # Check if already mounted
+      local mnt_point
+      mnt_point=$(findmnt -no TARGET "$dev" 2>/dev/null || grep -w "$dev" /proc/mounts | awk '{print $2}' | head -n 1 || true)
+      
+      if [ -n "$mnt_point" ] && [ -d "$mnt_point" ]; then
+        echo "  - Device $dev is already mounted at $mnt_point. Scanning..." >&2
         for fname in "${file_names[@]}"; do
-          local fpath="$temp_mount/$fname"
-          if [ -f "$fpath" ]; then
+          local fpath
+          fpath=$(find "$mnt_point" -maxdepth 3 -name "$fname" -type f 2>/dev/null | head -n 1)
+          if [ -n "$fpath" ] && [ -f "$fpath" ]; then
+            echo "    - Found PAT file: $fpath" >&2
             local val
-            val=$(cat "$fpath" 2>/dev/null | tr -d '\r')
-            if [[ "$val" =~ ^PAT=[\'\"]?(.*)[\'\"]?$ ]]; then
-              val="${BASH_REMATCH[1]}"
-            elif [[ "$val" =~ ^[\'\"]?(.*)[\'\"]?$ ]]; then
-              val="${BASH_REMATCH[1]}"
-            fi
-            val=$(echo "$val" | sed -e 's/^[ \t"'\'']*//' -e 's/[ \t"'\'']*$//')
+            val=$(parse_pat_file "$fpath")
             if [ -n "$val" ]; then
-              umount "$temp_mount" >/dev/null 2>&1 || umount -l "$temp_mount" >/dev/null 2>&1
-              rmdir "$temp_mount" >/dev/null 2>&1 || true
               echo "$val"
               return 0
             fi
           fi
         done
-        umount "$temp_mount" >/dev/null 2>&1 || umount -l "$temp_mount" >/dev/null 2>&1
+      else
+        echo "  - Device $dev is not mounted. Attempting to mount temporarily..." >&2
+        mkdir -p "$temp_mount"
+        local mount_err
+        mount_err=$(mount -o ro "$dev" "$temp_mount" 2>&1)
+        local mount_status=$?
+        
+        # Try without -o ro if read-only mount failed (some filesystems/drivers prefer default mount)
+        if [ $mount_status -ne 0 ]; then
+          mount_err=$(mount "$dev" "$temp_mount" 2>&1)
+          mount_status=$?
+        fi
+        
+        if [ $mount_status -eq 0 ]; then
+          echo "    - Successfully mounted $dev" >&2
+          for fname in "${file_names[@]}"; do
+            local fpath="$temp_mount/$fname"
+            if [ -f "$fpath" ]; then
+              echo "    - Found PAT file on mounted USB: $fpath" >&2
+              local val
+              val=$(parse_pat_file "$fpath")
+              if [ -n "$val" ]; then
+                umount "$temp_mount" >/dev/null 2>&1 || umount -l "$temp_mount" >/dev/null 2>&1
+                rmdir "$temp_mount" >/dev/null 2>&1 || true
+                echo "$val"
+                return 0
+              fi
+            fi
+          done
+          umount "$temp_mount" >/dev/null 2>&1 || umount -l "$temp_mount" >/dev/null 2>&1
+        else
+          echo "    ❌ Failed to mount $dev: $mount_err" >&2
+        fi
       fi
     fi
   done
 
   rmdir "$temp_mount" >/dev/null 2>&1 || true
+  echo "  ❌ PAT file not found on any USB drives" >&2
   return 1
 }
 
