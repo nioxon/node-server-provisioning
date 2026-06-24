@@ -67,10 +67,11 @@ cd "$FRONTEND_DIR"
 # -------------------------
 # 1. Install Node modules
 # -------------------------
-if [ ! -d "node_modules" ]; then
-  echo "▶ Installing Node modules..."
-  npm install --no-audit --no-fund --loglevel=error
-fi
+echo "▶ Installing Node modules..."
+# Use --legacy-peer-deps to resolve peer dependency conflicts (e.g. vite-plugin-pwa vs vite)
+rm -rf node_modules package-lock.json
+npm install --legacy-peer-deps --no-audit --no-fund --loglevel=error
+
 
 # -------------------------
 # 2. Configure Dynamic API Endpoints
@@ -90,7 +91,13 @@ fi
 # 3. Build Frontend
 # -------------------------
 echo "▶ Compiling frontend static assets (Vite)..."
-npm run build
+npm run build -- --mode production || {
+  echo "⚠ Build failed. Retrying with legacy peer deps cleared..."
+  rm -rf node_modules package-lock.json
+  npm install --legacy-peer-deps --no-audit --no-fund --loglevel=error
+  npm run build -- --mode production
+}
+
 
 # -------------------------
 # 3. Nginx Site Config (Serves main SITE_DOMAIN)
