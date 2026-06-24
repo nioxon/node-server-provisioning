@@ -66,27 +66,25 @@ detect_usb_pat() {
 
   for base in "${search_dirs[@]}"; do
     if [ -d "$base" ]; then
-      for mount in "$base"/*; do
-        if [ -d "$mount" ]; then
-          for fname in "${file_names[@]}"; do
-            local fpath="$mount/$fname"
-            if [ -f "$fpath" ]; then
-              local val
-              val=$(cat "$fpath" 2>/dev/null | tr -d '\r')
-              # Extract token value if formatted as PAT="value" or PAT='value' or PAT=value
-              if [[ "$val" =~ ^PAT=[\'\"]?(.*)[\'\"]?$ ]]; then
-                val="${BASH_REMATCH[1]}"
-              elif [[ "$val" =~ ^[\'\"]?(.*)[\'\"]?$ ]]; then
-                val="${BASH_REMATCH[1]}"
-              fi
-              # Trim spaces and quotes
-              val=$(echo "$val" | sed -e 's/^[ \t"'\'']*//' -e 's/[ \t"'\'']*$//')
-              if [ -n "$val" ]; then
-                echo "$val"
-                return 0
-              fi
-            fi
-          done
+      for fname in "${file_names[@]}"; do
+        # Search up to 3 levels deep (to cover /media/username/USB_label/)
+        local found_file
+        found_file=$(find "$base" -maxdepth 3 -name "$fname" -type f 2>/dev/null | head -n 1)
+        if [ -n "$found_file" ] && [ -f "$found_file" ]; then
+          local val
+          val=$(cat "$found_file" 2>/dev/null | tr -d '\r')
+          # Extract token value if formatted as PAT="value" or PAT='value' or PAT=value
+          if [[ "$val" =~ ^PAT=[\'\"]?(.*)[\'\"]?$ ]]; then
+            val="${BASH_REMATCH[1]}"
+          elif [[ "$val" =~ ^[\'\"]?(.*)[\'\"]?$ ]]; then
+            val="${BASH_REMATCH[1]}"
+          fi
+          # Trim spaces and quotes
+          val=$(echo "$val" | sed -e 's/^[ \t"'\'']*//' -e 's/[ \t"'\'']*$//')
+          if [ -n "$val" ]; then
+            echo "$val"
+            return 0
+          fi
         fi
       done
     fi
