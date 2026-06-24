@@ -115,9 +115,10 @@ else
   ARTISAN="php"
 fi
 
-# Clear cached config first to avoid loading old settings
-$ARTISAN artisan config:clear || true
-$ARTISAN artisan cache:clear || true
+# Clear any pre-existing cached config so artisan reads fresh .env values
+$ARTISAN artisan config:clear 2>/dev/null || true
+$ARTISAN artisan cache:clear 2>/dev/null || true
+$ARTISAN artisan view:clear 2>/dev/null || true
 
 # -------------------------
 # 4. App Key Generation
@@ -130,15 +131,24 @@ $ARTISAN artisan key:generate --force
 echo "▶ Creating dedicated MySQL user and privileges..."
 mysql -u root -e "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;"
 mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_USER_PASS}';"
-mysql -u root -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_USER_PASS}';"
+mysql -u root -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_USER_PASS}';"
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';"
 mysql -u root -e "FLUSH PRIVILEGES;"
 
-# Verify connection
-$ARTISAN artisan migrate:status >/dev/null 2>&1 || {
-  echo "❌ Database connection failed for user '$DB_USER'"
+# Verify MySQL user connection directly (not via artisan, to avoid config cache issues)
+echo "▶ Verifying MySQL user connection..."
+if ! mysql -u"${DB_USER}" -p"${DB_USER_PASS}" -h 127.0.0.1 -P 3306 "${DB_NAME}" -e "SELECT 1;" >/dev/null 2>&1; then
+  echo "❌ Direct MySQL connection test failed for user '${DB_USER}' on 127.0.0.1:3306"
+  echo "   Database: ${DB_NAME}"
+  echo "   Check MySQL status: systemctl status mysql"
+  echo "   Try manually: mysql -u${DB_USER} -p -h 127.0.0.1 ${DB_NAME}"
   exit 1
-}
+fi
+echo "✔ MySQL connection verified"
+
+# Reload fresh config now that DB user exists and credentials are confirmed
+$ARTISAN artisan config:clear 2>/dev/null || true
+$ARTISAN artisan cache:clear 2>/dev/null || true
 
 # -------------------------
 # 6. Database Migrations
