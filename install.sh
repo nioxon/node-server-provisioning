@@ -33,10 +33,9 @@ else
     git clone https://github.com/nioxon/node-server-provisioning.git /opt/nioxon
   else
     cd /opt/nioxon
-    git reset --hard HEAD
-    git clean -fd -e config/
     git fetch --all
-    git reset --hard origin/$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+    git reset --hard origin/main
+    git clean -fd -e config/
   fi
 fi
 

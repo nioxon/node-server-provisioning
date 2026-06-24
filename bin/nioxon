@@ -222,19 +222,34 @@ detect_usb_pat() {
     return 1
   fi
 
+  # Detect root disk to avoid scanning/mounting the host system drive
+  local root_partition
+  root_partition=$(findmnt -no SOURCE / 2>/dev/null || grep -w "/" /proc/mounts | awk '{print $1}' | head -n 1 || true)
+  local root_disk=""
+  if [ -n "$root_partition" ]; then
+    root_disk=$(echo "$root_partition" | sed -E 's/p?[0-9]+$//')
+    echo "  - Identified root OS disk: $root_disk (excluding from search)" >&2
+  fi
+
   for dev in "${usb_devs[@]}"; do
     if [ -b "$dev" ]; then
+      # Exclude root OS disk and its partitions
+      if [ -n "$root_disk" ] && [[ "$dev" == "$root_disk"* ]]; then
+        continue
+      fi
+      
+      echo "  - Evaluating block device: $dev" >&2
       # Check if already mounted
       local mnt_point
       mnt_point=$(findmnt -no TARGET "$dev" 2>/dev/null || grep -w "$dev" /proc/mounts | awk '{print $2}' | head -n 1 || true)
       
       if [ -n "$mnt_point" ] && [ -d "$mnt_point" ]; then
-        echo "  - Device $dev is already mounted at $mnt_point. Scanning..." >&2
+        echo "    - Device $dev is already mounted at $mnt_point. Scanning..." >&2
         for fname in "${file_names[@]}"; do
           local fpath
           fpath=$(find "$mnt_point" -maxdepth 3 -name "$fname" -type f 2>/dev/null | head -n 1)
           if [ -n "$fpath" ] && [ -f "$fpath" ]; then
-            echo "    - Found PAT file: $fpath" >&2
+            echo "      - Found PAT file: $fpath" >&2
             local val
             val=$(parse_pat_file "$fpath")
             if [ -n "$val" ]; then
@@ -244,7 +259,7 @@ detect_usb_pat() {
           fi
         done
       else
-        echo "  - Device $dev is not mounted. Attempting to mount temporarily..." >&2
+        echo "    - Device $dev is not mounted. Attempting to mount temporarily..." >&2
         mkdir -p "$temp_mount"
         local mount_err
         mount_err=$(mount -o ro "$dev" "$temp_mount" 2>&1)
@@ -257,11 +272,11 @@ detect_usb_pat() {
         fi
         
         if [ $mount_status -eq 0 ]; then
-          echo "    - Successfully mounted $dev" >&2
+          echo "      - Successfully mounted $dev" >&2
           for fname in "${file_names[@]}"; do
             local fpath="$temp_mount/$fname"
             if [ -f "$fpath" ]; then
-              echo "    - Found PAT file on mounted USB: $fpath" >&2
+              echo "      - Found PAT file on mounted USB: $fpath" >&2
               local val
               val=$(parse_pat_file "$fpath")
               if [ -n "$val" ]; then
@@ -274,7 +289,7 @@ detect_usb_pat() {
           done
           umount "$temp_mount" >/dev/null 2>&1 || umount -l "$temp_mount" >/dev/null 2>&1
         else
-          echo "    ❌ Failed to mount $dev: $mount_err" >&2
+          echo "      ❌ Failed to mount $dev: $mount_err" >&2
         fi
       fi
     fi
