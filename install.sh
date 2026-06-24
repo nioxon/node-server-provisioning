@@ -32,7 +32,9 @@ else
     rm -rf /opt/nioxon
     git clone https://github.com/nioxon/node-server-provisioning.git /opt/nioxon
   else
-    cd /opt/nioxon && git pull
+    cd /opt/nioxon
+    git fetch --all
+    git reset --hard origin/main
   fi
 fi
 
