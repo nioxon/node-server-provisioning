@@ -25,15 +25,18 @@
 
   # Configure PHP FPM and CLI upload limits for video streaming (10GB max)
   echo "⚙️ Tuning PHP-FPM and PHP-CLI limits for video uploads..."
-  
-  for ini in /etc/php/8.3/fpm/php.ini /etc/php/8.3/cli/php.ini; do
-    if [ -f "$ini" ]; then
-      perl -pi -e "s/^\s*;?\s*upload_max_filesize\s*=\s*.*/upload_max_filesize = 10G/i" "$ini"
-      perl -pi -e "s/^\s*;?\s*post_max_size\s*=\s*.*/post_max_size = 10G/i" "$ini"
-      perl -pi -e "s/^\s*;?\s*memory_limit\s*=\s*.*/memory_limit = 512M/i" "$ini"
-      perl -pi -e "s/^\s*;?\s*max_execution_time\s*=\s*.*/max_execution_time = 600/i" "$ini"
-    fi
-  done
+  PHP_SETTINGS_FILE="/etc/php/8.3/mods-available/nioxon-settings.ini"
+  cat > "$PHP_SETTINGS_FILE" <<EOF
+; NIOXON Custom PHP Settings
+upload_max_filesize = 10G
+post_max_size = 10G
+memory_limit = 512M
+max_execution_time = 600
+EOF
+
+  # Enable the custom settings for both FPM and CLI
+  ln -sf "$PHP_SETTINGS_FILE" /etc/php/8.3/fpm/conf.d/99-nioxon-settings.ini
+  ln -sf "$PHP_SETTINGS_FILE" /etc/php/8.3/cli/conf.d/99-nioxon-settings.ini
 
   # Enable and restart php8.3-fpm
   systemctl enable php8.3-fpm

@@ -85,7 +85,7 @@ DB_USER="nioxplay"
 perl -pi -e "s|^APP_NAME=.*|APP_NAME=NioxPlay-API|" .env
 perl -pi -e "s|^APP_ENV=.*|APP_ENV=local|" .env
 perl -pi -e "s|^APP_DEBUG=.*|APP_DEBUG=false|" .env
-perl -pi -e "s|^APP_URL=.*|APP_URL=http://api.$SITE_DOMAIN|" .env
+perl -pi -e "s|^APP_URL=.*|APP_URL=https://api.$SITE_DOMAIN|" .env
 
 perl -pi -e "s|^DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
 perl -pi -e "s|^DB_HOST=.*|DB_HOST=127.0.0.1|" .env
@@ -129,10 +129,8 @@ $ARTISAN artisan key:generate --force
 # 5. Database Setup
 # -------------------------
 echo "▶ Creating dedicated MySQL user and privileges..."
-mysql -u root -e "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;"
-mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_USER_PASS}';"
-mysql -u root -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED WITH mysql_native_password BY '${DB_USER_PASS}';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';"
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;"
+mysql -u root -e "GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$DB_USER_PASS';"
 mysql -u root -e "FLUSH PRIVILEGES;"
 
 # Verify MySQL user connection directly (not via artisan, to avoid config cache issues)
@@ -175,8 +173,15 @@ $ARTISAN artisan route:cache || true
 echo "▶ Configuring Nginx Site for API..."
 NGINX_API_CONFIG="/etc/nginx/sites-available/ott-api"
 cat > "$NGINX_API_CONFIG" <<EOF
+# Redirect HTTP to HTTPS
 server {
     listen 80;
+    server_name api.${SITE_DOMAIN} ott-api.test;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
     server_name api.${SITE_DOMAIN} ott-api.test;
     root ${API_DIR}/public;
 
@@ -185,6 +190,10 @@ server {
 
     # Support high file size uploads for video files
     client_max_body_size 10G;
+
+    # SSL Configuration
+    ssl_certificate /etc/nginx/ssl/wildcard.${SITE_DOMAIN}.crt;
+    ssl_certificate_key /etc/nginx/ssl/wildcard.${SITE_DOMAIN}.key;
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
@@ -235,5 +244,21 @@ EOF
 supervisorctl reread
 supervisorctl update
 supervisorctl start ott-api-worker:* || true
+
+echo "▶ Configuring Supervisor for API health monitor..."
+SUPERVISOR_HEALTH_CONF="/etc/supervisor/conf.d/api-health-monitor.conf"
+cat > "$SUPERVISOR_HEALTH_CONF" <<EOF
+[program:api-health-monitor]
+command=/opt/nioxon/monitoring/check_api_health.sh
+autostart=true
+autorestart=true
+user=root
+redirect_stderr=true
+stdout_logfile=/dev/null
+EOF
+
+supervisorctl reread
+supervisorctl update
+supervisorctl start api-health-monitor:* || true
 
 echo "✔ NioxPlay OTT API setup completed successfully"

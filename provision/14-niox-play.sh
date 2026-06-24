@@ -77,7 +77,7 @@ npm install --legacy-peer-deps --no-audit --no-fund --loglevel=error
 # 2. Configure Dynamic API Endpoints
 # -------------------------
 echo "▶ Configuring frontend environment variables..."
-echo "VITE_API_BASE_URL=http://api.${SITE_DOMAIN}/api/v1" > .env
+echo "VITE_API_BASE_URL=https://api.${SITE_DOMAIN}/api/v1" > .env
 
 # Resilient inline patching to support repositories that don't have dynamic endpoint code yet
 if [ -f "src/store/api.js" ]; then
@@ -105,8 +105,16 @@ npm run build -- --mode production || {
 echo "▶ Configuring Nginx Site for Frontend..."
 NGINX_FRONTEND_CONFIG="/etc/nginx/sites-available/niox-play"
 cat > "$NGINX_FRONTEND_CONFIG" <<EOF
+# Redirect HTTP to HTTPS
 server {
     listen 80;
+    server_name ${SITE_DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    # This is not the default_server anymore, captive portal handles that.
+    listen 443 ssl http2;
     server_name ${SITE_DOMAIN};
     root ${FRONTEND_DIR}/dist;
 
@@ -117,6 +125,14 @@ server {
         # Fallback to index.html for Single Page Application (SPA) routing
         try_files \$uri \$uri/ /index.html;
     }
+
+        # Fallback to index.html for Single Page Application (SPA) routing
+        try_files \$uri \$uri/ /index.html;
+    }
+    
+    # SSL Configuration
+    ssl_certificate /etc/nginx/ssl/wildcard.${SITE_DOMAIN}.crt;
+    ssl_certificate_key /etc/nginx/ssl/wildcard.${SITE_DOMAIN}.key;
 
     location = /favicon.ico { access_log off; log_not_found off; }
     location = /robots.txt  { access_log off; log_not_found off; }

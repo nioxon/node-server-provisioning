@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -e
-apt install -y network-manager
-systemctl enable NetworkManager
-systemctl start NetworkManager
+
+echo "🔌 Installing and enabling NetworkManager..."
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y --no-install-recommends network-manager
+systemctl enable --now NetworkManager

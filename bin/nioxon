@@ -341,7 +341,7 @@ configure() {
 
   if [[ "$USE_DEFAULTS" =~ ^[Yy] ]]; then
     PROJECT_NAME="nioxon"
-    SITE_DOMAIN="nioxplay.local"
+    SITE_DOMAIN="nioxplay.lan"
     LAN_IP="192.168.1.2"
     LAN_NETMASK="24"
     ENABLE_DHCP="true"
@@ -360,8 +360,8 @@ configure() {
     read -p "Project name [nioxon]: " PROJECT_NAME
     PROJECT_NAME=${PROJECT_NAME:-nioxon}
 
-    read -p "Domain [nioxplay.local]: " SITE_DOMAIN
-    SITE_DOMAIN=${SITE_DOMAIN:-nioxplay.local}
+    read -p "Domain [nioxplay.lan]: " SITE_DOMAIN
+    SITE_DOMAIN=${SITE_DOMAIN:-nioxplay.lan}
 
     read -p "LAN interface [$LAN_IFACE]: " IN_LAN
     LAN_IFACE=${IN_LAN:-$LAN_IFACE}
