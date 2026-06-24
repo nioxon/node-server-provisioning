@@ -60,6 +60,40 @@ require_internet() {
   }
 }
 
+detect_usb_pat() {
+  local search_dirs=("/media" "/mnt")
+  local file_names=("github.pat" "github_pat.txt" "pat.txt" "nioxon_pat.txt")
+
+  for base in "${search_dirs[@]}"; do
+    if [ -d "$base" ]; then
+      for mount in "$base"/*; do
+        if [ -d "$mount" ]; then
+          for fname in "${file_names[@]}"; do
+            local fpath="$mount/$fname"
+            if [ -f "$fpath" ]; then
+              local val
+              val=$(cat "$fpath" 2>/dev/null | tr -d '\r')
+              # Extract token value if formatted as PAT="value" or PAT='value' or PAT=value
+              if [[ "$val" =~ ^PAT=[\'\"]?(.*)[\'\"]?$ ]]; then
+                val="${BASH_REMATCH[1]}"
+              elif [[ "$val" =~ ^[\'\"]?(.*)[\'\"]?$ ]]; then
+                val="${BASH_REMATCH[1]}"
+              fi
+              # Trim spaces and quotes
+              val=$(echo "$val" | sed -e 's/^[ \t"'\'']*//' -e 's/[ \t"'\'']*$//')
+              if [ -n "$val" ]; then
+                echo "$val"
+                return 0
+              fi
+            fi
+          done
+        fi
+      done
+    fi
+  done
+  return 1
+}
+
 # ---------------- Step Runner (WITH RESUME) ----------------
 run_step() {
   local step="$1"
@@ -108,8 +142,13 @@ configure() {
     API_SOURCE_VALUE="https://github.com/nioxon/nioxplay-app-ott-api"
     FRONTEND_SOURCE_VALUE="https://github.com/nioxon/niox-play"
     
-    read -sp "GitHub Personal Access Token (for private repos, hidden): " GITHUB_PAT
-    echo ""
+    GITHUB_PAT=$(detect_usb_pat || true)
+    if [ -n "$GITHUB_PAT" ]; then
+      green "🔑 GitHub PAT successfully loaded from USB drive"
+    else
+      read -sp "GitHub Personal Access Token (for private repos, hidden): " GITHUB_PAT
+      echo ""
+    fi
   else
     read -p "Project name [nioxon]: " PROJECT_NAME
     PROJECT_NAME=${PROJECT_NAME:-nioxon}
@@ -145,8 +184,13 @@ configure() {
       read -p "Frontend Git Repository URL [https://github.com/nioxon/niox-play]: " FRONTEND_SOURCE_VALUE
       FRONTEND_SOURCE_VALUE=${FRONTEND_SOURCE_VALUE:-https://github.com/nioxon/niox-play}
 
-      read -sp "GitHub Personal Access Token (for private repos, hidden): " GITHUB_PAT
-      echo ""
+      GITHUB_PAT=$(detect_usb_pat || true)
+      if [ -n "$GITHUB_PAT" ]; then
+        green "🔑 GitHub PAT successfully loaded from USB drive"
+      else
+        read -sp "GitHub Personal Access Token (for private repos, hidden): " GITHUB_PAT
+        echo ""
+      fi
     elif [ "$APP_SOURCE_TYPE" = "local" ]; then
       read -p "Local API Directory Path: " API_SOURCE_VALUE
       read -p "Local Frontend Directory Path: " FRONTEND_SOURCE_VALUE

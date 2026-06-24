@@ -103,15 +103,26 @@ if [ ! -d "vendor" ]; then
 fi
 
 # -------------------------
-# 3. App Key Generation
-# -------------------------
-php artisan key:generate --force
-
-# -------------------------
-# 4. Storage & Permissions
+# 3. Storage & Permissions (Ensure www-data ownership before running commands)
 # -------------------------
 chown -R www-data:www-data "$API_DIR"
 chmod -R 775 storage bootstrap/cache
+
+# Determine runner command (support mock macOS environments)
+if id "www-data" &>/dev/null; then
+  ARTISAN="sudo -u www-data php"
+else
+  ARTISAN="php"
+fi
+
+# Clear cached config first to avoid loading old settings
+$ARTISAN artisan config:clear || true
+$ARTISAN artisan cache:clear || true
+
+# -------------------------
+# 4. App Key Generation
+# -------------------------
+$ARTISAN artisan key:generate --force
 
 # -------------------------
 # 5. Database Setup
@@ -119,11 +130,12 @@ chmod -R 775 storage bootstrap/cache
 echo "▶ Creating dedicated MySQL user and privileges..."
 mysql -u root -e "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;"
 mysql -u root -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_USER_PASS}';"
+mysql -u root -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_USER_PASS}';"
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';"
 mysql -u root -e "FLUSH PRIVILEGES;"
 
 # Verify connection
-php artisan migrate:status >/dev/null 2>&1 || {
+$ARTISAN artisan migrate:status >/dev/null 2>&1 || {
   echo "❌ Database connection failed for user '$DB_USER'"
   exit 1
 }
@@ -134,17 +146,18 @@ php artisan migrate:status >/dev/null 2>&1 || {
 if [ -f database/init.sql ]; then
   echo "▶ Importing database schema from SQL..."
   mysql -u"$DB_USER" -p"$DB_USER_PASS" "$DB_NAME" < database/init.sql
+  $ARTISAN artisan migrate --force
 else
-  php artisan migrate --force
-  php artisan db:seed --force 2>/dev/null || true
+  $ARTISAN artisan migrate --force
+  $ARTISAN artisan db:seed --force 2>/dev/null || true
 fi
 
 # -------------------------
 # 7. Caching & Optimization
 # -------------------------
-php artisan config:clear
-php artisan config:cache
-php artisan route:cache || true
+$ARTISAN artisan config:clear
+$ARTISAN artisan config:cache
+$ARTISAN artisan route:cache || true
 
 # -------------------------
 # 8. Nginx Site Config (Resolves api.* and ott-api.test)

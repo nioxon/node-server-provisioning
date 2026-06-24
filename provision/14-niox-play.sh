@@ -73,7 +73,21 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # -------------------------
-# 2. Build Frontend
+# 2. Configure Dynamic API Endpoints
+# -------------------------
+echo "▶ Configuring frontend environment variables..."
+echo "VITE_API_BASE_URL=http://api.${SITE_DOMAIN}/api/v1" > .env
+
+# Resilient inline patching to support repositories that don't have dynamic endpoint code yet
+if [ -f "src/store/api.js" ]; then
+  perl -pi -e "s|'https://nioxplay.nioxon.cloud/api/v1'|import.meta.env.VITE_API_BASE_URL \|\| 'https://nioxplay.nioxon.cloud/api/v1'|g" src/store/api.js
+fi
+if [ -f "src/pages/movies/MovieLists.vue" ]; then
+  perl -pi -e "s|'https://nioxplay.nioxon.cloud'|(import.meta.env.VITE_API_BASE_URL \|\| 'https://nioxplay.nioxon.cloud').replace\(\/\\\\\/api\\\\\/v1\\\\\/\?\\\$\/, ''\)|g" src/pages/movies/MovieLists.vue
+fi
+
+# -------------------------
+# 3. Build Frontend
 # -------------------------
 echo "▶ Compiling frontend static assets (Vite)..."
 npm run build

@@ -12,6 +12,9 @@ interface=${LAN_IFACE}
 bind-interfaces
 listen-address=${LAN_IP}
 
+# Prevent local DNS loops by ignoring /etc/resolv.conf
+no-resolv
+
 domain-needed
 bogus-priv
 
