@@ -20,9 +20,17 @@ if [ -f "$SCRIPT_DIR/bin/nioxon" ] && [ -d "$SCRIPT_DIR/provision" ]; then
     "$SCRIPT_DIR/" /opt/nioxon/
 else
   # Production remote deployment mode
+  if [ -d /opt/nioxon/.git ]; then
+    current_remote=$(cd /opt/nioxon && git config --get remote.origin.url || echo "")
+    if [[ "$current_remote" != *"node-server-provisioning"* ]]; then
+      echo "🔄 Stale repository remote detected ($current_remote). Re-cloning..."
+      rm -rf /opt/nioxon
+    fi
+  fi
+
   if [ ! -d /opt/nioxon/.git ]; then
     rm -rf /opt/nioxon
-    git clone https://github.com/nioxon/provision.git /opt/nioxon
+    git clone https://github.com/nioxon/node-server-provisioning.git /opt/nioxon
   else
     cd /opt/nioxon && git pull
   fi

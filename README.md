@@ -98,7 +98,7 @@ sudo ./install.sh
 #### **B. Production Mode (Target Server)**
 Download and run the installer via terminal:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nioxon/provision/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/nioxon/node-server-provisioning/main/install.sh | sudo bash
 ```
 
 ### 2. Provisioning Commands
