@@ -44,12 +44,12 @@ fi
 
 chmod +x /opt/nioxon/bin/nioxon
 
-# Global launcher (PATH-safe launcher in /usr/bin)
-cat > /usr/bin/nioxon <<'EOF'
+# Global launcher (PATH-safe launcher in /usr/local/bin)
+cat > /usr/local/bin/nioxon <<'EOF'
 #!/usr/bin/env bash
 exec /opt/nioxon/bin/nioxon "$@"
 EOF
-chmod +x /usr/bin/nioxon
+chmod +x /usr/local/bin/nioxon
 
 echo "✔ NIOXON CLI successfully installed!"
 echo "👉 Run: sudo nioxon setup"
