@@ -3,13 +3,20 @@ set -e
 
 echo "📦 Installing and hardening MySQL Server..."
 
-apt install -y mysql-server
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y mysql-server
 
-# Run mysql_secure_installation non-interactively
-mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '';"
-mysql_secure_installation --use-default
+systemctl enable --now mysql
 
-systemctl enable mysql
-systemctl start mysql
+# Ubuntu configures MySQL root with socket authentication. Keep it that way so
+# root-run provisioning scripts can administer MySQL without storing a root
+# password. Never assign an empty password: validate_password rejects it.
+mysql --protocol=socket --user=root <<'SQL'
+ALTER USER 'root'@'localhost' IDENTIFIED WITH auth_socket;
+DROP USER IF EXISTS ''@'localhost';
+DROP DATABASE IF EXISTS test;
+DELETE FROM mysql.db WHERE Db = 'test' OR Db LIKE 'test\_%';
+FLUSH PRIVILEGES;
+SQL
 
 echo "✔ MySQL installation complete."
