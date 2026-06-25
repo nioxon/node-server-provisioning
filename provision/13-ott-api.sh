@@ -72,7 +72,7 @@ cd "$API_DIR"
 # Generate secure DB credentials
 DB_PASS_FILE="/opt/nioxon/config/db.pass"
 if [ ! -f "$DB_PASS_FILE" ]; then
-  DB_USER_PASS=$(openssl rand -hex 16)
+  DB_USER_PASS=$(openssl rand -base64 24)
   echo "$DB_USER_PASS" > "$DB_PASS_FILE"
   chmod 600 "$DB_PASS_FILE"
 else
