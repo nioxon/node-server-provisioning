@@ -14,9 +14,6 @@ cat > /var/www/captive/index.html <<EOF
   <meta charset="UTF-8">
   <title>Welcome to NioxPlay</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0a051b;
@@ -34,7 +31,7 @@ cat > /var/www/captive/index.html <<EOF
     body {
       background-color: var(--bg);
       color: var(--text);
-      font-family: 'Outfit', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -153,9 +150,34 @@ server {
   server_name _;
   root /var/www/captive;
   index index.html;
-  
-  # Allow Apple / Android captive portal test requests to load or be redirected
-  # (Crucial for auto-triggering the OS login prompt)
+
+  # Send common captive-portal probes to the real HTTP application hostname.
+  # HTTPS probes must fail normally; presenting our private certificate for a
+  # Google/Apple/Microsoft hostname causes certificate-security warnings.
+  location = /generate_204 {
+    return 302 http://${SITE_DOMAIN}/;
+  }
+
+  location = /gen_204 {
+    return 302 http://${SITE_DOMAIN}/;
+  }
+
+  location = /hotspot-detect.html {
+    return 302 http://${SITE_DOMAIN}/;
+  }
+
+  location = /library/test/success.html {
+    return 302 http://${SITE_DOMAIN}/;
+  }
+
+  location = /connecttest.txt {
+    return 302 http://${SITE_DOMAIN}/;
+  }
+
+  location = /ncsi.txt {
+    return 302 http://${SITE_DOMAIN}/;
+  }
+
   location / {
     try_files \$uri \$uri/ /index.html;
   }
