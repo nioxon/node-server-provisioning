@@ -69,14 +69,32 @@ cd "$API_DIR"
 # -------------------------
 [ ! -f .env ] && cp .env.example .env
 
-# Generate secure DB credentials
+# Generate secure DB credentials that satisfy MySQL's default MEDIUM policy.
+# The fixed prefix guarantees uppercase, lowercase, numeric, and special
+# characters; the random suffix supplies 160 bits of entropy.
 DB_PASS_FILE="/opt/nioxon/config/db.pass"
-if [ ! -f "$DB_PASS_FILE" ]; then
-  DB_USER_PASS=$(openssl rand -hex 16)
+
+generate_db_password() {
+  printf 'A1!a%s' "$(openssl rand -hex 20)"
+}
+
+password_meets_mysql_policy() {
+  local password="$1"
+  [ "${#password}" -ge 16 ] &&
+    [[ "$password" =~ [A-Z] ]] &&
+    [[ "$password" =~ [a-z] ]] &&
+    [[ "$password" =~ [0-9] ]] &&
+    [[ "$password" =~ [^a-zA-Z0-9] ]]
+}
+
+if [ -f "$DB_PASS_FILE" ]; then
+  DB_USER_PASS=$(cat "$DB_PASS_FILE")
+fi
+
+if [ -z "${DB_USER_PASS:-}" ] || ! password_meets_mysql_policy "$DB_USER_PASS"; then
+  DB_USER_PASS=$(generate_db_password)
   echo "$DB_USER_PASS" > "$DB_PASS_FILE"
   chmod 600 "$DB_PASS_FILE"
-else
-  DB_USER_PASS=$(cat "$DB_PASS_FILE")
 fi
 
 DB_NAME="nioxplay"
@@ -130,7 +148,8 @@ $ARTISAN artisan key:generate --force
 # -------------------------
 echo "▶ Creating dedicated MySQL user and privileges..."
 mysql -u root -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;"
-mysql -u root -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$DB_USER_PASS';"
+mysql -u root -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
+mysql -u root -e "ALTER USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_USER_PASS';"
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'localhost';"
 mysql -u root -e "FLUSH PRIVILEGES;"
 
