@@ -446,6 +446,7 @@ install() {
   run_step "06-node" "Node.js"
   run_step "07-redis" "Redis"
   run_step "08-supervisor" "Supervisor"
+  run_step "09-ssl" "Local SSL certificates"
 
   bold "⚠ Phase 2 — Captive Network"
   run_step "10-lan" "LAN Netplan"

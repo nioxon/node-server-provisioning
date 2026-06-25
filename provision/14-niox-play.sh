@@ -125,10 +125,6 @@ server {
         # Fallback to index.html for Single Page Application (SPA) routing
         try_files \$uri \$uri/ /index.html;
     }
-
-        # Fallback to index.html for Single Page Application (SPA) routing
-        try_files \$uri \$uri/ /index.html;
-    }
     
     # SSL Configuration
     ssl_certificate /etc/nginx/ssl/wildcard.${SITE_DOMAIN}.crt;
