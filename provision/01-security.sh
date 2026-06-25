@@ -3,10 +3,23 @@ set -e
 
 source /opt/nioxon/config/runtime.env
 
-echo "🔒 Configuring UFW security firewall..."
+echo "🔒 Configuring SSH access and UFW firewall..."
 
-# Install UFW
-apt-get install -y ufw
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y ufw openssh-server
+
+# Enable SSH password login for the installer-created administrator account.
+# Root login remains disabled; SSH keys continue to work as well.
+mkdir -p /etc/ssh/sshd_config.d
+cat > /etc/ssh/sshd_config.d/00-nioxon-password-auth.conf <<'EOF'
+PasswordAuthentication yes
+PubkeyAuthentication yes
+PermitRootLogin no
+UsePAM yes
+EOF
+
+sshd -t
+systemctl enable --now ssh
 
 # Set default policies (Deny incoming, Allow outgoing)
 ufw --force default deny incoming
@@ -34,4 +47,4 @@ fi
 # Enable UFW
 ufw --force enable
 
-echo "✔ Security firewall configured successfully"
+echo "✔ SSH access and firewall configured successfully"
