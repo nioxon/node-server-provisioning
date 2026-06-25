@@ -70,7 +70,7 @@ cd "$API_DIR"
 [ ! -f .env ] && cp .env.example .env
 
 # Generate secure DB credentials
-DB_USER_PASS="nioxplay@2190"
+DB_USER_PASS="Nioxplay@2190!"
 
 DB_NAME="nioxplay"
 DB_USER="nioxplay"
