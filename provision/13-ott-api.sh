@@ -72,7 +72,7 @@ cd "$API_DIR"
 # Generate secure DB credentials
 DB_PASS_FILE="/opt/nioxon/config/db.pass"
 if [ ! -f "$DB_PASS_FILE" ]; then
-  DB_USER_PASS=$(openssl rand -base64 24)
+  DB_USER_PASS=$(head /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 20 ; echo 'aA1!')
   echo "$DB_USER_PASS" > "$DB_PASS_FILE"
   chmod 600 "$DB_PASS_FILE"
 else
@@ -130,8 +130,7 @@ $ARTISAN artisan key:generate --force
 # -------------------------
 echo "▶ Creating dedicated MySQL user and privileges..."
 mysql -u root -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;"
-mysql -u root -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_USER_PASS}';"
-#mysql -u root -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$DB_USER_PASS';"
+mysql -u root -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$DB_USER_PASS';"
 mysql -u root -e "GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'localhost';"
 mysql -u root -e "FLUSH PRIVILEGES;"
 
