@@ -70,7 +70,14 @@ cd "$API_DIR"
 [ ! -f .env ] && cp .env.example .env
 
 # Generate secure DB credentials
-DB_USER_PASS="Nioxplay@2190!"
+DB_PASS_FILE="/opt/nioxon/config/db.pass"
+if [ ! -f "$DB_PASS_FILE" ]; then
+  DB_USER_PASS=$(openssl rand -hex 16)
+  echo "$DB_USER_PASS" > "$DB_PASS_FILE"
+  chmod 600 "$DB_PASS_FILE"
+else
+  DB_USER_PASS=$(cat "$DB_PASS_FILE")
+fi
 
 DB_NAME="nioxplay"
 DB_USER="nioxplay"
