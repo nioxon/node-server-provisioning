@@ -441,6 +441,7 @@ install() {
   run_step "01-security" "Security"
   run_step "02-network-manager" "NetworkManager"
   run_step "03-nginx" "Nginx"
+  run_step "03b-local-cdn" "Local HLS CDN (Zero-Buffering)"
   run_step "04-php" "PHP"
   run_step "05-mysql" "MySQL"
   run_step "06-node" "Node.js"

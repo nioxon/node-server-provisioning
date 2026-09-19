@@ -204,7 +204,67 @@ server {
     # Support high file size uploads for video files
     client_max_body_size 10G;
 
+    # =========================================================================
+    # 🚀 LOCAL HLS ZERO-BUFFERING CHUNK CDN (Kernel Zero-Copy Direct I/O)
+    # =========================================================================
+    location /hls/ {
+        alias /opt/nioxon/media/hls/;
+
+        # Kernel Zero-Copy & High-Concurrency optimizations
+        sendfile on;
+        sendfile_max_chunk 512k;
+        tcp_nopush on;
+        tcp_nodelay on;
+        aio threads;
+        directio 8m;
+
+        # CORS Headers for all client origins
+        add_header Access-Control-Allow-Origin * always;
+        add_header Access-Control-Allow-Methods 'GET, HEAD, OPTIONS' always;
+        add_header Access-Control-Allow-Headers 'Range, Origin, Accept, X-Requested-With, Content-Type' always;
+        add_header Access-Control-Expose-Headers 'Content-Length, Content-Range, Accept-Ranges' always;
+
+        # HLS Playlists (.m3u8) - Realtime Manifests
+        location ~* \.m3u8$ {
+            add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+            add_header Access-Control-Allow-Origin * always;
+            types {
+                application/vnd.apple.mpegurl m3u8;
+            }
+        }
+
+        # Video Chunks (.ts, .m4s) - Aggressive Passenger Device Caching
+        location ~* \.(ts|m4s)$ {
+            add_header Cache-Control "public, max-age=31536000, immutable" always;
+            add_header Accept-Ranges bytes always;
+            add_header Access-Control-Allow-Origin * always;
+            types {
+                video/mp2t ts;
+                video/iso.segment m4s;
+            }
+        }
+    }
+
+    # Static Media Storage Alias
+    location /media/ {
+        alias /opt/nioxon/media/;
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        add_header Access-Control-Allow-Origin * always;
+        add_header Accept-Ranges bytes always;
+    }
+
     location / {
+        # Allow Cross-Origin API requests from In-Bus PWA / Capacitor App
+        add_header Access-Control-Allow-Origin * always;
+        add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header Access-Control-Allow-Headers 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-Device-UID,X-Device-Secret' always;
+
+        if (\$request_method = 'OPTIONS') {
+            return 204;
+        }
+
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
 

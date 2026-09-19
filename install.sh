@@ -46,6 +46,7 @@ if [ ! -f /opt/nioxon/bin/nioxon ]; then
 fi
 
 chmod +x /opt/nioxon/bin/nioxon
+[ -f /opt/nioxon/bin/niox-hls-packager.sh ] && chmod +x /opt/nioxon/bin/niox-hls-packager.sh
 
 # Global launcher (PATH-safe launcher in /usr/local/bin)
 cat > /usr/local/bin/nioxon <<'EOF'
@@ -54,5 +55,13 @@ exec /opt/nioxon/bin/nioxon "$@"
 EOF
 chmod +x /usr/local/bin/nioxon
 
-echo "✔ NIOXON CLI successfully installed!"
+if [ -f /opt/nioxon/bin/niox-hls-packager.sh ]; then
+  cat > /usr/local/bin/niox-hls-packager <<'EOF'
+#!/usr/bin/env bash
+exec /opt/nioxon/bin/niox-hls-packager.sh "$@"
+EOF
+  chmod +x /usr/local/bin/niox-hls-packager
+fi
+
+echo "✔ NIOXON CLI & HLS Packager successfully installed!"
 echo "👉 Run: sudo nioxon setup"
